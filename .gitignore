@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.env
+model_output/
+data/raw/
+data/processed/
+*.bin
+*.safetensors
+.cache/
