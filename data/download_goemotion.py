@@ -72,13 +72,13 @@ def translate_batch(texts: list, batch_size: int = 10) -> list:
             try:
                 vi_text = translator.translate(text)
                 batch_translated.append(vi_text)
-                time.sleep(0.1)  #tránh rate limit
+                time.sleep(0.1)
             except Exception as e:
                 print(f"Translation error: {e}")
-                batch_translated.append(text)  #giữ nguyên nếu lỗi
+                batch_translated.append(text)
         
         translated.extend(batch_translated)
-        time.sleep(0.5)  #nghỉ giữa batches
+        time.sleep(0.5) 
     
     return translated
 
@@ -98,7 +98,6 @@ def process_dataset(split: str, ds, id2label: dict, max_samples: int = None) -> 
         
         emotion_info = get_primary_label(labels, id2label)
         
-        # Lấy tất cả labels nếu có nhiều
         all_emotions = [id2label[l] for l in labels]
         secondary = [GO_EMOTION_MAP.get(e, {}).get("vi", e) 
                     for e in all_emotions[1:]]
@@ -123,15 +122,14 @@ def main():
     print("Downloading GoEmotions.")
     ds = load_dataset("google-research-datasets/go_emotions", "simplified")
     
-    # Lấy label mapping
-    id2label = ds['train'].features['labels'].feature.int2str
+    label_names = ds['train'].features['labels'].feature.names
+    id2label = {i: name for i, name in enumerate(label_names)}
     
     print(f"Dataset loaded!")
     print(f"Train: {len(ds['train'])} samples")
     print(f"Val:   {len(ds['validation'])} samples")
     print(f"Test:  {len(ds['test'])} samples")
     
-    # Xem phân phối labels
     print("\nLabel distribution (train, top 10):")
     all_labels = []
     for item in ds['train']:
@@ -142,27 +140,20 @@ def main():
     for label, count in top_labels:
         print(f"  {label}: {count}")
     
-    print("\nProcessing dataset...")
+    print("\nProcessing dataset")
     
-    # Test
     TEST_SIZE = 500
-    print(f"Processing {TEST_SIZE} samples for testing.")
+    print(f"Processing {TEST_SIZE} samples for testing")
     
     samples = process_dataset('train', ds, id2label, max_samples=TEST_SIZE)
     
-    # Save English version
     df = pd.DataFrame(samples)
     df.to_csv("data/raw/go_emotions_en.csv", index=False, encoding='utf-8')
     print(f"\nSaved {len(df)} English samples to data/raw/go_emotions_en.csv")
-    
-    # Dịch
-    print("\nTranslating to Vietnamese...")
-    print("(Chỉ dịch 100 samples đầu để test tốc độ)")
-    
+        
     texts_en = df['text_en'].tolist()[:100]
     texts_vi = translate_batch(texts_en, batch_size=5)
     
-    # Lưu kết quả dịch
     df_vi = df.head(100).copy()
     df_vi['text_vi'] = texts_vi
     df_vi.to_csv("data/raw/go_emotions_vi_sample.csv", index=False, encoding='utf-8')
