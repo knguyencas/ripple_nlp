@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
+from huggingface_hub import snapshot_download
 import os
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -43,7 +44,18 @@ class RippleModel(nn.Module):
             'pooled':   cls,
         }
 
+def ensure_model():
+    if not os.path.exists(f'{MODEL_DIR}/best_model.pt'):
+        print("Model not found locally, downloading from HuggingFace...")
+        snapshot_download(
+            repo_id=os.getenv('HF_REPO_ID', 'knguyencas/ripple-nlp-model'),
+            local_dir=MODEL_DIR,
+            token=os.getenv('HF_TOKEN')
+        )
+        print("Download complete.")
+
 def load_model():
+    ensure_model()
     tokenizer = AutoTokenizer.from_pretrained(f'{MODEL_DIR}/tokenizer')
     model = RippleModel()
     model.load_state_dict(torch.load(
