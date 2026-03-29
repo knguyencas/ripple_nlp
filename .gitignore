@@ -6,7 +6,9 @@ model_output/
 *.bin
 *.safetensors
 .cache/
-
+model_files/
 data/raw/
 data/processed/
 data/__pycache__/
+notebooks/
+.env

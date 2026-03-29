@@ -1,13 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .schemas.analyze import AnalyzeRequest, AnalyzeResponse
-from .services.analyzer import analyzer
+from contextlib import asynccontextmanager
+from app.services.analyzer import load_model, predict
+from app.schemas.analyze import AnalyzeRequest, AnalyzeResponse
+import uvicorn
 
-app = FastAPI(
-    title="Ripple NLP Service",
-    description="NLP microservice for Ripple app",
-    version="1.0.0"
-)
+ml = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Loading Ripple NLP model...")
+    ml['model'], ml['tokenizer'] = load_model()
+    print("Model ready.")
+    yield
+    ml.clear()
+
+app = FastAPI(title="Ripple NLP Service", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,27 +25,16 @@ app.add_middleware(
 )
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "ripple-nlp"}
+def health():
+    return {"status": "ok", "model_loaded": "model" in ml}
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-def analyze_text(req: AnalyzeRequest):
-    if not req.text or len(req.text.strip()) < 3:
+def analyze(req: AnalyzeRequest):
+    if not req.text or len(req.text.strip()) < 5:
         raise HTTPException(status_code=400, detail="Text quá ngắn")
+    if len(req.text) > 2000:
+        raise HTTPException(status_code=400, detail="Text quá dài (max 2000 ký tự)")
+    return predict(req.text, ml['model'], ml['tokenizer'])
 
-    try:
-        result = analyzer.analyze(req.text)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/analyze/batch")
-def analyze_batch(texts: list[str]):
-    results = []
-    for text in texts[:20]:
-        try:
-            result = analyzer.analyze(text)
-            results.append(result)
-        except:
-            results.append(None)
-    return results
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
